@@ -4,7 +4,7 @@ import math
 import re
 from collections import Counter
 
-from .settings import COLUMNS, FEATURES, FIELDS, TARGET
+from .settings import COLUMNS, FEATURES, FIELDS, PRIORITY_RECORD, TARGET
 
 CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 SPLITS = {"train", "holdout", "pending"}
@@ -32,6 +32,15 @@ def parse_measurement(value, field: str, line: int) -> float:
     return 0.0 if result == 0 else result
 
 
+def parse_record(value, line: int) -> str | None:
+    """Optional reference of a late-arriving priority submission record."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    if isinstance(value, str) and CODE.fullmatch(value.strip()):
+        return value.strip()
+    raise ValueError(f"第 {line} 条的{FIELDS[PRIORITY_RECORD]}须留空，或为 1 至 64 位编号，以英文字母或数字开头。")
+
+
 def normalize_rows(rows: list[dict]) -> list[dict]:
     ids = set()
     batch_splits = {}
@@ -51,15 +60,17 @@ def normalize_rows(rows: list[dict]) -> list[dict]:
             raise ValueError(f"拉伸批次 {batch} 同时出现在不同记录用途，请整批划分。")
         target = raw[TARGET]
         if split == "pending":
-            if target is not None and not (isinstance(target, str) and not target.strip()):
-                raise ValueError(f"第 {line} 条待检试片的破坏峰值须留空。")
-            target = None
+            if target is None or (isinstance(target, str) and not target.strip()):
+                target = None
+            else:
+                target = parse_measurement(target, TARGET, line)
         else:
             target = parse_measurement(target, TARGET, line)
         ids.add(row_id)
         counts[split] += 1
         readings = {field: parse_measurement(raw[field], field, line) for field in FEATURES}
-        normalized.append({"id": row_id, "batch_id": batch, "split": split, **readings, TARGET: target})
+        normalized.append({"id": row_id, "batch_id": batch, "split": split, **readings, TARGET: target,
+                           PRIORITY_RECORD: parse_record(raw[PRIORITY_RECORD], line)})
     if counts["train"] < 9 or sum(split == "train" for split in batch_splits.values()) < 3:
         raise ValueError("训练至少需要 9 条实测拉伸记录，且覆盖 3 个独立批次。")
     if counts["holdout"] < 2:

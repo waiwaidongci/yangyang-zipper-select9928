@@ -6,9 +6,11 @@ from .elastic import fit
 from .evaluation import retest_queue, validate_batches
 from .fixtures import demo_rows
 from .records import normalize_rows
-from .reports import point_table, resampling_table, retest_table, validation_tables
+from .reports import (point_table, resampling_table, retest_table, validation_tables,
+                      verification_draw_table, verification_risk_table)
 from .selection import point_plan
 from .settings import FEATURES, SPEC, parse_settings
+from .verification import RISK_EMPTY, RISK_PAUSED, verification_report
 
 __all__ = ["SPEC", "demo_rows", "normalize_rows", "analyze"]
 
@@ -26,7 +28,10 @@ def analyze(rows: list[dict], settings: dict) -> dict:
     trimmed = fit(train, chosen, options["alpha"], options["l1_ratio"])
     comparison, observed = validate_batches(cohorts["holdout"], full, trimmed)
     queue = retest_queue(cohorts["pending"], trimmed, options["retest_force_n"])
+    draws, risks = verification_report(cohorts["pending"], trimmed, options["retest_force_n"],
+                                       options["verification_draws"])
     overall = comparison[0]
+    risk_overall = risks[0]
     warnings = []
     if not chosen:
         warnings.append("当前频率和布点预算下没有入选测点。独立批对照使用训练均值，待检件暂停排序建议。")
@@ -36,16 +41,28 @@ def analyze(rows: list[dict], settings: dict) -> dict:
         warnings.append("独立验证目前仅覆盖一个批次，建议结合其他生产批次复核。")
     if not queue:
         warnings.append("本次台账未含待检试片，待检清单为空。")
+    elif risk_overall["status"] == RISK_EMPTY:
+        warnings.append("待检批没有可用的验证样本，漏检风险不报数。")
+    elif any(row["status"] == RISK_PAUSED for row in risks):
+        warnings.append("部分验证样本尚未测齐，漏检风险暂停报数。")
+    verification = (f"每批约定抽签 {options['verification_draws']} 片，"
+                    f"共 {risk_overall['samples']} 片有效验证样本。") if queue else ""
     return {
         "summary": (f"用 {len(train)} 片历史试片完成 {options['resamples']} 轮整批重采样。"
                     f"{len(chosen)} 个测点入选，每片布点 {used}/{options['budget_seconds']} 秒。"
-                    f"冻结训练模型后，对照 {len(comparison) - 1} 个独立批共 {overall['rows']} 片的误差。"),
+                    f"冻结训练模型后，对照 {len(comparison) - 1} 个独立批共 {overall['rows']} 片的误差。"
+                    f"{verification}"),
         "metrics": {"入选测点数": len(chosen), "布点时间（秒/片）": used, "预算（秒/片）": options["budget_seconds"],
                     "独立批全测点 MAE（N）": round(overall["full_mae_n"], 6),
                     "独立批筛选测点 MAE（N）": round(overall["selected_mae_n"], 6),
                     "独立批 MAE 增量（N）": round(overall["mae_delta_n"], 6),
-                    "优先做破坏试验件数": sum(row["action"] == "优先做破坏试验" for row in queue)},
+                    "优先做破坏试验件数": sum(row["action"] == "优先做破坏试验" for row in queue),
+                    "抽签验证样本数": risk_overall["samples"],
+                    "漏检风险（总体）": (round(risk_overall["miss_risk"], 6)
+                                      if risk_overall["miss_risk"] is not None else None)},
         "tables": [point_table(plan, full, trimmed, options["budget_seconds"], options["resamples"]),
-                   *validation_tables(comparison, observed), retest_table(queue), resampling_table(trace)],
+                   *validation_tables(comparison, observed), retest_table(queue),
+                   verification_draw_table(draws), verification_risk_table(risks),
+                   resampling_table(trace)],
         "warnings": warnings,
     }

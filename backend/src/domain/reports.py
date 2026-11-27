@@ -55,6 +55,21 @@ def retest_table(rows: list[dict]) -> dict:
     }, rows)
 
 
+def verification_draw_table(rows: list[dict]) -> dict:
+    return table("verification_draws", "待检批抽签验证明细", {
+        "batch_id": FIELDS["batch_id"], "draw_order": "抽签顺序", "id": FIELDS["id"],
+        "estimated_force_n": "筛选测点估计（N）", "status": "抽签状态", "actual_n": "实测破坏力（N）",
+    }, rows)
+
+
+def verification_risk_table(rows: list[dict]) -> dict:
+    return table("verification_risk", "抽签验证漏检风险", {
+        "scope": "汇总范围", "batch_id": FIELDS["batch_id"], "samples": "有效样本数",
+        "measured": "已实测数", "below_line": "实测低于提示线数", "miss_risk": "漏检风险估计",
+        "retest_force_n": "原提示线（N）", "status": "报数状态",
+    }, rows)
+
+
 def resampling_table(rows: list[dict]) -> dict:
     return table("resample_trace", "整批重采样明细", {
         "iteration": "轮次", "batch_ids": "入样训练批次", "rows": "样本数", "active_points": "非零系数测点",

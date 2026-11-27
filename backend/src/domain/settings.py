@@ -13,12 +13,15 @@ POINTS = {
 }
 FEATURES = tuple(POINTS)
 TARGET = "break_force_n"
-COLUMNS = ("id", "batch_id", "split", *FEATURES, TARGET)
+PRIORITY_RECORD = "priority_record"
+COLUMNS = ("id", "batch_id", "split", *FEATURES, TARGET, PRIORITY_RECORD)
 FIELDS = {
     "id": "试片编号", "batch_id": "拉伸批次", "split": "记录用途",
     **{feature: point[0] for feature, point in POINTS.items()}, TARGET: "破坏峰值（N）",
+    PRIORITY_RECORD: "优先送检记录",
 }
 RESAMPLE_SEED = 261125
+VERIFICATION_SEED = 261126
 SETTINGS = [
     {"key": "alpha", "label": "Elastic Net 惩罚强度", "default": 2.2, "min": 0.1, "max": 100, "step": 0.1},
     {"key": "l1_ratio", "label": "L1 惩罚占比", "default": 0.65, "min": 0.05, "max": 0.95, "step": 0.05},
@@ -26,6 +29,7 @@ SETTINGS = [
     {"key": "min_frequency", "label": "最低入选频率", "default": 0.7, "min": 0.5, "max": 1, "step": 0.05},
     {"key": "budget_seconds", "label": "单片布点时长预算（秒）", "default": 12, "min": 1, "max": 45, "step": 1},
     {"key": "retest_force_n", "label": "破坏力复测提示线（N）", "default": 108, "min": 1, "max": 5000, "step": 1},
+    {"key": "verification_draws", "label": "每批抽签验证片数", "default": 2, "min": 0, "max": 20, "step": 1},
 ]
 SPEC = {
     "columns": list(COLUMNS),

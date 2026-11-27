@@ -4,7 +4,7 @@ import csv
 import sys
 from random import Random
 
-from .settings import COLUMNS, TARGET
+from .settings import COLUMNS, FEATURES, PRIORITY_RECORD, TARGET
 
 DEMO_SEED = 20261125
 
@@ -32,9 +32,10 @@ def demo_rows() -> list[dict]:
                     6.1 + rng.uniform(-0.3, 0.3),
                 )
                 force = 117 - 11 * gap + 9 * crimp + 6 * spring + 3 * drift + rng.uniform(-2.5, 2.5)
-                values = (f"{batch}-{index:02d}", batch, split, *(round(v, 4) for v in readings))
-                row = dict(zip(COLUMNS[:-1], values))
+                row = {"id": f"{batch}-{index:02d}", "batch_id": batch, "split": split,
+                       **dict(zip(FEATURES, (round(v, 4) for v in readings)))}
                 row[TARGET] = None if split == "pending" else round(force, 3)
+                row[PRIORITY_RECORD] = None
                 rows.append(row)
     return rows
 

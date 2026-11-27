@@ -42,7 +42,7 @@ PYTHONPATH=backend python3 -m src.domain.fixtures > /tmp/zipper-pull-test.csv
 
 | 路径 | 工具与职责 |
 |---|---|
-| `backend/src/domain/` | Python 标准库实现输入校验、种子、Elastic Net、稳定点位和批次误差 |
+| `backend/src/domain/` | Python 标准库实现输入校验、种子、Elastic Net、稳定点位、批次误差和抽签验证 |
 | `backend/src/routes/`、`services/`、`models/` | FastAPI、SQLAlchemy、JWT 权限、队列和结果持久化 |
 | `backend/scripts/`、`migrations/` | 幂等演示数据、数据库引导和 worker 心跳 |
 | `../../test-artifacts/yangyang-zipper-select/tests/oracle.py` | 独立近端梯度求解、闭式样本、批次隔离及 CSV 断言 |
@@ -51,6 +51,12 @@ PYTHONPATH=backend python3 -m src.domain.fixtures > /tmp/zipper-pull-test.csv
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend python3 ../../test-artifacts/yangyang-zipper-select/tests/oracle.py
+```
+
+抽签验证口径的仓库自检：
+
+```sh
+PYTHONPATH=backend python3 backend/tests/test_verification.py
 ```
 
 `backend/src/constants/workflow.py` 定义 `admin/analyst/viewer`、`queued/running/completed/failed` 及 `approved/rejected`，分别用于路由鉴权、worker 状态和签核下载。`backend/src/domain/records.py` 定义 `train/holdout/pending`，用于整批导入校验和计算分区。第三方依赖使用各自的许可证。
