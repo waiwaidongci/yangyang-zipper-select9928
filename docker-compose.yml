@@ -1,0 +1,70 @@
+name: yangyang-zipper-select
+
+x-app: &app
+  image: yangyang-zipper-select-app:local
+  environment:
+    DATABASE_URL: "mysql+pymysql://workbench:demo-db-local@db:3306/workbench?charset=utf8mb4"
+    REDIS_URL: "redis://redis:6379/0"
+    JWT_SECRET: "${JWT_SECRET:-demo-signing-key-local-only-setup}"
+    SEED_DEMO: "${SEED_DEMO:-true}"
+  volumes: ["reports:/artifacts"]
+  restart: unless-stopped
+
+services:
+  backend:
+    <<: *app
+    build: ./backend
+    container_name: "${COMPOSE_PROJECT_NAME:-yangyang-zipper-select}-backend"
+    ports: ["127.0.0.1:${BACKEND_PORT:-19431}:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 35
+  worker:
+    <<: *app
+    pull_policy: never
+    command: ["python", "-m", "src.worker"]
+    container_name: "${COMPOSE_PROJECT_NAME:-yangyang-zipper-select}-worker"
+    depends_on:
+      backend: {condition: service_healthy}
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "scripts.check_worker"]
+      interval: 2s
+      timeout: 3s
+      retries: 25
+  db:
+    container_name: "${COMPOSE_PROJECT_NAME:-yangyang-zipper-select}-db"
+    ports: ["127.0.0.1:${DB_PORT:-17931}:3306"]
+    image: mysql:8.0
+    environment:
+      MYSQL_USER: workbench
+      MYSQL_PASSWORD: demo-db-local
+      MYSQL_ROOT_PASSWORD: demo-root-local
+      MYSQL_DATABASE: workbench
+    volumes: ["database:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u workbench -p$$MYSQL_PASSWORD workbench -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 2s
+      timeout: 4s
+      retries: 55
+  redis:
+    image: redis:7-alpine
+    container_name: "${COMPOSE_PROJECT_NAME:-yangyang-zipper-select}-redis"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 25
+
+volumes:
+  database:
+  redis-data:
+  reports:
